@@ -27,6 +27,7 @@ public class FishTrigger : MonoBehaviour
                 return;
             }
 
+            Debug.Log("Fish hit: " + other.name);
             // Attempt to hook the fish
             FishController.Instance.HookFish(transform);
 

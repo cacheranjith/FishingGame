@@ -31,7 +31,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: -0.1, y: 0.1, z: 0.1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -49,9 +49,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   fishSpritePrefab: {fileID: 0}
+  fishTypes: []
+  levels: []
   speed: 5
   minX: -5
   maxX: 5
+  spawnMinX: 0
+  spawnMaxX: 0
+  spawnMinY: 0
+  spawnMaxY: 0
 --- !u!212 &2549619820314086709
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -191,3 +197,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a7727a1f849a8ae41b267b9c84849268, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  enableDebugLogs: 1

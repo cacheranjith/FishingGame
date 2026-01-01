@@ -1,24 +1,45 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+[System.Serializable]
+public class FishType
+{
+    public GameObject prefab;
+    public int value;
+    public float speedMultiplier = 1f;
+}
+
+[System.Serializable]
+public class LevelRule
+{
+    public int maxFishCatch;
+}
+
 public class FishController : MonoBehaviour
 {
     public static FishController Instance;
 
     public GameObject fishSpritePrefab;
 
+    [Header("Fish Types")]
+    public FishType[] fishTypes;
+    public LevelRule[] levels;
+    private int currentLevel = 0;
+    private int currentCatch = 0;
+
     public float speed = 2f;
     public float minX = -5f;
     public float maxX = 5f;
-public float spawnMinX;
-public float spawnMaxX;
-public float spawnMinY;
-public float spawnMaxY;
+    public float spawnMinX;
+    public float spawnMaxX;
+    public float spawnMinY;
+    public float spawnMaxY;
 
     private List<Transform> fishes = new List<Transform>();
     private List<SpriteRenderer> renderers = new List<SpriteRenderer>();
     private List<int> directions = new List<int>(); // 1 = right, -1 = left
     private List<bool> isHooked = new List<bool>();
+    private List<int> fishTypeIndex = new List<int>();
 
     void Awake()
     {
@@ -31,78 +52,91 @@ public float spawnMaxY;
     }
 
     void SpawnFish(int count)
+{
+    for (int i = 0; i < count; i++)
     {
-        for (int i = 0; i < count; i++)
-        {
-            float x = Random.Range(spawnMinX, spawnMaxX);
-            float y = Random.Range(spawnMinY, spawnMaxY);
+        // 1️⃣ Pick random fish type
+        int typeIndex = Random.Range(0, fishTypes.Length);
+        FishType type = fishTypes[typeIndex];
 
-            GameObject fishObj = Instantiate(
-                fishSpritePrefab,
-                new Vector3(x, y, 0),
-                Quaternion.identity,
-                transform
-            );
+        // 2️⃣ Random spawn position (within reachable area)
+        float x = Random.Range(spawnMinX, spawnMaxX);
+        float y = Random.Range(spawnMinY, spawnMaxY);
 
-            Transform fishTf = fishObj.transform;
-            SpriteRenderer sr = fishObj.GetComponent<SpriteRenderer>();
+        // 3️⃣ Spawn fish
+        GameObject fishObj = Instantiate(
+            type.prefab,
+            new Vector3(x, y, 0),
+            Quaternion.identity,
+            transform
+        );
 
-            int dir = Random.value > 0.5f ? 1 : -1;
+        // 4️⃣ Cache components
+        Transform fishTf = fishObj.transform;
+        SpriteRenderer sr = fishObj.GetComponent<SpriteRenderer>();
 
-            fishes.Add(fishTf);
-            renderers.Add(sr);
-            directions.Add(dir);
-            isHooked.Add(false);
+        // 5️⃣ Direction
+        int dir = Random.value > 0.5f ? 1 : -1;
 
-            // 🔑 FORCE FLIP VISUALLY
-            sr.flipX = (dir == -1);
-        }
+        fishes.Add(fishTf);
+        renderers.Add(sr);
+        directions.Add(dir);
+        isHooked.Add(false);
+        fishTypeIndex.Add(typeIndex);
+
+        // 6️⃣ NORMALIZE orientation
+        sr.flipX = false;
     }
+}
 
     public void HookFish(Transform fish)
     {
-        Debug.Log($"[FishController] HookFish called for: {fish.name}");
+    if (currentCatch >= levels[currentLevel].maxFishCatch)
+        return;
 
-        int index = fishes.IndexOf(fish);
-        if (index == -1)
-        {
-            Debug.LogError($"[FishController] Fish {fish.name} not found in fishes list!");
-            return;
-        }
+    int index = fishes.IndexOf(fish);
+    if (index == -1 || isHooked[index])
+        return;
 
-        Debug.Log($"[FishController] Fish index: {index}, marking as hooked");
-        isHooked[index] = true;
+    isHooked[index] = true;
 
-        // Find the hook GameObject
-        GameObject hookObj = GameObject.FindGameObjectWithTag("Hook");
-        if (hookObj == null)
-        {
-            Debug.LogError("[FishController] Hook GameObject not found! Make sure hook is tagged as 'Hook'");
-            return;
-        }
+    Transform hook = GameObject.FindGameObjectWithTag("Hook").transform;
 
-        Debug.Log($"[FishController] Hook found: {hookObj.name}, parenting fish to hook");
+    fish.SetParent(hook);
 
-        // Handle Rigidbody2D to prevent physics interference
-        Rigidbody2D fishRb = fish.GetComponent<Rigidbody2D>();
-        if (fishRb != null)
-        {
-            // Make it kinematic so physics doesn't interfere with parent transform
-            fishRb.bodyType = RigidbodyType2D.Kinematic;
-            fishRb.velocity = Vector2.zero;
-            fishRb.angularVelocity = 0f;
-            Debug.Log($"[FishController] Set fish Rigidbody2D to Kinematic and cleared velocity");
-        }
+    int value = fishTypes[fishTypeIndex[index]].value;
+Debug.Log("Caught fish value: " + value);
 
-        // Set parent to hook
-        fish.SetParent(hookObj.transform);
+    // STACKING
+    float offsetY = -0.4f * currentCatch;
+    fish.localPosition = new Vector3(0, offsetY, 0);
 
-        // Reset local position to attach at hook's position
-        // You can adjust this offset if you want the fish to appear at a specific position relative to the hook
-        fish.localPosition = Vector3.zero;
-
-        Debug.Log($"[FishController] Fish {fish.name} successfully parented to hook. Local pos: {fish.localPosition}");
+    currentCatch++;
     }
+
+    public void ClearHookedFish()
+{
+    for (int i = 0; i < fishes.Count; i++)
+    {
+        if (isHooked[i])
+        {
+            fishes[i].gameObject.SetActive(false);
+            isHooked[i] = false;
+        }
+    }
+
+    currentCatch = 0;
+}
+
+public void NextLevel()
+{
+    currentLevel++;
+
+    if (currentLevel >= levels.Length)
+    {
+        currentLevel = levels.Length - 1; // stay at last level
+    }
+}
 
     void Update()
     {
@@ -110,7 +144,8 @@ public float spawnMaxY;
         {
             if (isHooked[i]) continue;
 
-            fishes[i].Translate(Vector3.right * directions[i] * speed * Time.deltaTime);
+            float typeSpeed = speed * fishTypes[fishTypeIndex[i]].speedMultiplier;
+            fishes[i].Translate(Vector3.right * directions[i] * typeSpeed * Time.deltaTime);
 
             if (fishes[i].position.x > maxX)
             {
@@ -123,5 +158,6 @@ public float spawnMaxY;
                 renderers[i].flipX = false;
             }
         }
+        Debug.Log("Level: " + currentLevel + " / Caught: " + currentCatch);
     }
 }
